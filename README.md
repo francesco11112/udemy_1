@@ -89,8 +89,110 @@ You can directly import the Solr dashboard [via grafana.com](https://grafana.co
 In this tutorial we will give a practical example of running the `solr-exporter` in a SolrCloud cluster.  
 We will use a three node SolrCloud cluster with a Data Historian Collection and a Zookeeper ensemble (of three) and push metrics to Prometheus using the `solr-exporter`. Finally we will visualize the operating system, metrics pulled by Prometheus, listening on http://localhost:9090 and the `solr-exporter` metrics listening on http://localhost:9854 via Grafana using some prebuilt dashboards.
 
+## Zookeeper
 
-solr dashboard
+Start a Zookeeper service on each of the three nodes
+
+```bash
+$ cd /opt/zookeeper/apache-zookeeper-3.8.4-bin
+[root@hdpv1 apache-zookeeper-3.8.4-bin]#  bin/zkServer.sh start-foreground
+[root@hdpv2 apache-zookeeper-3.8.4-bin]#  bin/zkServer.sh start-foreground
+[root@hdpv3 apache-zookeeper-3.8.4-bin]#  bin/zkServer.sh start-foreground
+```
+## Solr
+
+Next start Solr on each of the three nodes
+
+```bash
+$ cd /opt/solr/solr-8.11.4
+[root@hdpv1 solr-8.11.4]# bin/solr start -force -c -s /opt/solr/solr-8.11.4/data/historian -p 8983 -z 192.168.1.40:2181,192.168.1.41:2181,192.168.1.42:2181
+[root@hdpv2 solr-8.11.4]# bin/solr start -force -c -s /opt/solr/solr-8.11.4/data/historian -p 8983 -z 192.168.1.40:2181,192.168.1.41:2181,192.168.1.42:2181
+[root@hdpv3 solr-8.11.4]# bin/solr start -force -c -s /opt/solr/solr-8.11.4/data/historian -p 8983 -z 192.168.1.40:2181,192.168.1.41:2181,192.168.1.42:2181
+
+$ Waiting up to 180 seconds to see Solr running on port 8983 [|]  
+$ Started Solr server on port 8983 (pid=10415). Happy searching!
+```
+
+Go to our web browser on http://localhost:8983 and connect to Solr
+
+
+Here is a screenshot of SolrCloud in graph mode
+
+<img width="1680" height="1050" alt="snapshot8June15" src="https://github.com/user-attachments/assets/d50cd6e2-9e32-4622-9c73-379956d6bd28" />
+
+
+Here is a screenshot of SolrCloud monitoring the Zookeeper ensemble
+
+<img width="1280" height="1024" alt="snapshot4" src="https://github.com/user-attachments/assets/7b78af67-5b3e-4b97-a2ba-64050d814939" />
+
+
+Here is a screenshot of SolrCloud monitoring the cluster nodes
+
+<img width="1280" height="1024" alt="snapshot6" src="https://github.com/user-attachments/assets/7beca442-66b5-48c4-ae98-d2f3933150cc" />
+
+## Historian
+
+Next start Data Historian on one or all three nodes
+
+```bash
+
+$  cd /opt/historian/historian-1.3.9/
+[root@hdpv1 historian-1.3.9]# java -jar /opt/historian/historian-1.3.9/lib/historian-server-1.3.9-fat.jar  -conf /opt/historian/historian-1.3.9/conf/historian-server-conf.json
+
+$ [vert.x-eventloop-thread-0] INFO  hurence.webapiservice.WebApiMainVerticleConf line 18 - loading conf from json
+$ INFO: Succeeded in deploying verticle
+```
+
+## Prometheus
+
+Start the Prometheus server on all three nodes listening on http://localhost:9090 
+
+```bash
+$ cd /opt/prometheus/prometheus-3.5.0.linux-amd64
+[root@hdpv1 prometheus-3.5.0.linux-amd64]# ./prometheus --config.file=prometheus.yml
+[root@hdpv2 prometheus-3.5.0.linux-amd64]# ./prometheus --config.file=prometheus.yml
+[root@hdpv3 prometheus-3.5.0.linux-amd64]# ./prometheus --config.file=prometheus.yml
+```
+## Solr-exporter
+
+Start the Prometheus server on all three nodes listening on http://localhost:9854
+
+```bash
+$  cd /opt/solr/solr-8.11.4/contrib/prometheus-exporter
+[root@hdpv1 prometheus-exporter]# ./bin/solr-exporter -p 9854 -z '192.168.1.40:2181,192.168.1.41:2181,192.168.1.42:2181' --config-file ./conf/solr-exporter-config.xml --num-threads 16
+[root@hdpv2 prometheus-exporter]# ./bin/solr-exporter -p 9854 -z '192.168.1.40:2181,192.168.1.41:2181,192.168.1.42:2181' --config-file ./conf/solr-exporter-config.xml --num-threads 16
+[root@hdpv3 prometheus-exporter]# ./bin/solr-exporter -p 9854 -z '192.168.1.40:2181,192.168.1.41:2181,192.168.1.42:2181' --config-file ./conf/solr-exporter-config.xml --num-threads 16
+```
+We can now go to our web browser on http://localhost:9090 and connect to the Prometheus GUI
+
+We can see from the Status Toolbar our two targets 'prometheus' and 'solr'
+
+<img width="1280" height="1024" alt="snapshot2Nov32" src="https://github.com/user-attachments/assets/e42ac92b-9bbe-48d0-aa91-c0819757e3f8" />
+
+By clicking on the Endpoint link for these two targets we can get a detailed view of the metrics being scraped
+
+Here is the target 'prometheus'
+
+<img width="1280" height="1024" alt="snapshot2Nov33" src="https://github.com/user-attachments/assets/e7940963-ee76-4da2-8952-673768554752" />
+
+Here is the target 'solr'
+
+<img width="1280" height="1024" alt="snapshot2Nov34" src="https://github.com/user-attachments/assets/147e44db-992f-4c1d-914f-3feb289f0f56" />
+
+## Grafana
+
+Finally start Grafana on one or all three nodes
+
+```bash
+$ systemctl daemon-reload
+$ systemctl start grafana-server
+$ systemctl status grafana-server
+```
+Go to our web browser on http://localhost:3000 and connect to Grafana using user 'admin' and password 'admin'
+
+***
+
+Solr dashboard
 
 <img width="1280" height="1024" alt="snapshot1Nov18" src="https://github.com/user-attachments/assets/2e3097d5-455a-494d-80d6-ea855fd64d93" />
 
@@ -98,4 +200,3 @@ solr dashboard
 solrCloud mode
 
 
-<img width="1680" height="1050" alt="snapshot8June15" src="https://github.com/user-attachments/assets/d50cd6e2-9e32-4622-9c73-379956d6bd28" />
